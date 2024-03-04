@@ -1,0 +1,35 @@
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+EEBoom 	            KEYWORD1
+EETool 	            KEYWORD1
+
+################ CONFIG ###############
+
+################ MACRO ################
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+begin 	            KEYWORD2
+commit 	            KEYWORD2
+dump 	            KEYWORD2
+currentSect 	    KEYWORD2
+goZero 	            KEYWORD2
+printInfo 	        KEYWORD2
+data 	            KEYWORD2
+printMsg 	        KEYWORD2
+setPort 	        KEYWORD2
+setPort 	        KEYWORD2
+
+
+# Methods for EETool
+spiffsLastSector 	KEYWORD2
+app1LastSector 	    KEYWORD2
+printRanges 	    KEYWORD2
+lastSectorByName 	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
