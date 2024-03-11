@@ -30,7 +30,7 @@ void setup() {
   Serial.println();
   //-------------------------
   param.setPort(Serial);                  //where should it print
-  param.begin(1000, 2);                   //5 sectors 1000 -> 999
+  param.begin(1000, 2);                   //2 sectors 1000 -> 999
   param.printMsg();                       //print if begin() was ok or not
 
   Serial.println(param.data.devID, HEX);  //get ID from our paramPROM
