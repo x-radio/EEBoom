@@ -23,13 +23,13 @@ protected:
     uint16_t                    crntSect;
     uint16_t                    crntAddr;
     uint8_t                     lastMsg = NO_MSG;
-    Stream                      *stream = nullptr;
+    Stream                      *stream = &Serial;
 
     EEBoomBase(uint16_t SlotSize, const uint16_t DataSize, uint8_t Ds, uint8_t *Slot, uint8_t *Data, uint16_t *Crc):
         slotSize(SlotSize), dataSize(DataSize), ds(Ds),
         slot(Slot), data(Data), crc(Crc) {};
 
-    uint16_t getCheckSumm(uint8_t* addr);
+    void calculateSumm(uint16_t *summ, uint8_t *chunk, uint16_t size);
     bool sectIsClr();
 
     public:
@@ -79,7 +79,7 @@ class EEBoom : public EEBoomBase
     Type&           data = slot.dt;
 
     static_assert(sizeof(Slot) % 4 == 0, "Caution, EEBoom slot is not a multiple of 4");
-    static_assert(sizeof(Slot) < sectSize-2, "Caution, EEBoom slot is too large");
+    static_assert(sizeof(Slot) <= sectSize, "Caution, EEBoom slot is too large");
 };
 //=============================================================================
 class EETool

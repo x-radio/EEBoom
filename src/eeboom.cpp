@@ -10,19 +10,19 @@
 //=============================================================================
 #define DFLT_SECT_CNT           2
 #define FLASH_LIFE_CYCLES       10000
+#define CHUNK_SIZE              (1<<6)
 //=============================================================================
 bool EEBoomBase::begin(uint16_t FirstSect, uint16_t SectCnt)
 {
-    uint8_t             temp;
+    uint8_t             temp;                                           //valid slot flag
     uint16_t            oldSect = 0;
     uint16_t            oldAddr = 0;
     uint32_t            fullAddr;
-    uint8_t             firstSlot[slotSize];                            //in total there will be 2 structures on the stack, they will store current or old data depending on the situation
-    uint8_t             secndSlot[slotSize];
-    uint8_t             *crntPntr = firstSlot;                          //will point to one structure or the other.
-    uint8_t             *oldPntr = secndSlot;
-    uint8_t             *tempPntr = NULL;                               //is needed to move main pointers from structure to structure
-    uint16_t            *checkSumm;
+    uint32_t            oldFullAddr = 0;
+    uint32_t            offset;                                         //fullAddr offset - step through whole slot
+    uint8_t             chunk[CHUNK_SIZE];
+    uint16_t            crntSumm = 0;                                   //check summ accum
+    uint16_t            size = 0;                                       //size of crnt chunk
 
     if(SectCnt == 0) return false;
 
@@ -37,34 +37,46 @@ bool EEBoomBase::begin(uint16_t FirstSect, uint16_t SectCnt)
         fullAddr = eeBase-sectSize*i;
         for(uint16_t x = 0; x < slotCnt; x++)
         {
-            spi_flash_read(fullAddr, (uint32_t*)crntPntr, slotSize);
-            checkSumm = (uint16_t*)(crntPntr + dataSize + ds);          //pointer to crc (in the slot right after the end of data and dummy)
-            if(*checkSumm == getCheckSumm((uint8_t*)crntPntr))          //in the case of a good copy
-                temp = 1;                                               //leave a flag
-            else
-            {                                                           //if the copy is broken
-                if(temp == 1)                                           //but there have been some good ones
-                    goto profit;                                        //brake cycles
+            offset = crntSumm = 0;
+            while (offset < slotSize)
+            {
+                if(offset+CHUNK_SIZE < slotSize)
+                    size = CHUNK_SIZE;
+                else
+                    size = slotSize - offset;                           //if last chunk
+
+                spi_flash_read(fullAddr+offset, (uint32_t*)chunk, size);
+
+                if(offset+CHUNK_SIZE < slotSize)
+                    calculateSumm(&crntSumm, chunk, size);
+                else
+                    calculateSumm(&crntSumm, chunk, size-ds-2);         //exept dummy and crc fields in last chunk
+
+                offset += CHUNK_SIZE;
             }
-            fullAddr += slotSize;
-            oldAddr = crntAddr;
-            crntAddr++;
-            tempPntr = oldPntr;                                         //so change pointers between structures
-            oldPntr = crntPntr;
-            crntPntr = tempPntr;
+            if(crntSumm == *(uint16_t*)(chunk+size-2))                  //if checksumm from last chunk is equal to calculated one
+                temp = 1;                                               //in case of a good copy leave a flag
+            else
+                if(temp == 1) goto profit;                              //if the copy is broken but there have been some good ones brake cycles
+                else break;                                             //if the copy is broken and there was no valid one then next page
+
+            oldFullAddr = fullAddr;
             oldSect = crntSect;                                         //if it has not left the loop after the first pass (zero address), then the page will not need to be changed
+            oldAddr = crntAddr;
+            fullAddr += slotSize;
+            crntAddr++;
         }
         crntSect++;
     }
-    if(temp == 1 && sectCnt == 1) goto profit;                          //in case of single-page working
+    if(temp == 1) goto profit;                                          //in case of single-page working
     lastMsg = ZERO_INIT;
-    crntAddr = -1;                                                      //
+    crntAddr = -1;
     crntSect = 0;
     return true;
     profit:                                                             //if the data is found, load it
     crntAddr = oldAddr;                                                 //return the addresses to the last valid ones
     crntSect = oldSect;
-    memcpy((void*)slot, (void*)oldPntr, slotSize);                      //load the finished slot
+    spi_flash_read(oldFullAddr, (uint32_t*)slot, slotSize);             //load the finished slot
     lastMsg = INIT_OK;
     return true;
 }
@@ -113,7 +125,8 @@ bool EEBoomBase::commit()
     uint16_t  oldAddr = crntAddr;
     uint8_t   flag = 0;                                                 //the page has changed and we have to erase the flash after recording, the next intit can stay on the old...
 
-    *crc = getCheckSumm(data);                                          //calculate the checksum (in the inheritor structure)
+    *crc = 0;
+    calculateSumm(crc, data, dataSize);
 
     if(lastMsg == NO_PARTITION) return false;
 
@@ -235,15 +248,13 @@ void EEBoomBase::printInfo(uint32_t CommitIntrvlMin)
     stream->printf("Approximate flash life time: %d days\r\n", lt/24/60);
 }
 //----------------------------
-uint16_t EEBoomBase::getCheckSumm(uint8_t* addr)
+void EEBoomBase::calculateSumm(uint16_t *summ, uint8_t *chunk, uint16_t size)
 {
-    uint16_t checkSumm = 0;
-    for(uint8_t i = 0; i < dataSize; i++)
+    for(uint16_t i = 0; i < size; i++)
     {
-        checkSumm += *addr * 44111 + 1;
-        addr++;
+        *summ = (*summ + *chunk) * 44111 + 1;
+        chunk++;
     }
-    return checkSumm;
 }
 //----------------------------
 bool EEBoomBase::sectIsClr()
