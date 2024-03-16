@@ -27,8 +27,8 @@ void setup() {
 }
 
 void loop() {
-    ee.data.step++;                     //you can do it realy often -
-    ee.commit();                        //this case about 340 times per sector!!!
+    ee.data.step++;                     //change data in RAM
+    ee.commit();                        //fix it in flash memory
     delay(1000);
 }
 ```
